@@ -174,6 +174,7 @@ public class GameManagerUnity : MonoBehaviour
             url = url.Replace("{port}", CubeWorld.Gameplay.MultiplayerServerGameplay.SERVER_PORT.ToString());
             registerWebServerRequest = new WWW(url);
             timerUpdate = 30;
+            Debug.Log(url);
         }
     }
 

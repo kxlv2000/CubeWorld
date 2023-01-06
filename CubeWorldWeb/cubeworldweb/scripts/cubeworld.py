@@ -21,7 +21,7 @@ class ListServers(webapp.RequestHandler):
         mindate = datetime.today() - timedelta(seconds=60)
         servers_query = CubeworldRemoteServer.all().filter('date >= ', mindate).order('-date')
         servers = servers_query.fetch(20)
-        
+        self.response.out.write("100.000.000.000,405,qwe,rfrf")
         for server in servers:
             self.response.out.write(server.ip + ',' + str(server.port) + ',' + server.owner + ',' + server.description + ';')
 

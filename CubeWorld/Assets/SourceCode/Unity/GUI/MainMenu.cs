@@ -2,9 +2,25 @@ using UnityEngine;
 using System.Collections;
 using CubeWorld.Gameplay;
 using CubeWorld.Configuration;
-
+using System;
+using System.IO;
 public class MainMenu
 {
+    public string [,] users =new string[10,3];
+
+    public string [,] ownership = new string[10,3];
+
+    private int usercount=0;
+    private int currentuser=0;
+    public double money=100;
+    public double sizePrice=0;
+    public double terrainPrice=0;
+    public double totalPrice=0;
+    public string input="1";
+    private string username="Test user";
+    private string password="Password";
+
+    
     private GameManagerUnity gameManagerUnity;
 
     public MainMenu(GameManagerUnity gameManagerUnity)
@@ -12,8 +28,57 @@ public class MainMenu
         this.gameManagerUnity = gameManagerUnity;
     }
 
+    private string path = @"user.csv";
+    private string path1 = @"ownership.csv";
+
+    public void Write()
+    {
+
+        File.Delete(path);
+        File.Create(path).Close();
+        File.Delete(path1);
+        File.Create(path1).Close();
+        StreamWriter stream = new StreamWriter(path);
+        StreamWriter stream1 = new StreamWriter(path1);
+
+        for (int i = 0; i < 10; i++)
+        {
+            stream.WriteLine(users[i,0]+","+users[i,1]+","+users[i,2]);
+            stream1.WriteLine(ownership[i,0]+","+ownership[i,1]+","+ownership[i,2]);
+        }
+
+        stream.Close();
+        stream.Dispose();
+        stream1.Close();
+        stream1.Dispose();
+    }
+
+    public void Read()
+    {
+        if (!File.Exists(path)|!File.Exists(path1))
+            return;
+        string line, line1;
+        StreamReader stream = new StreamReader(path);
+        StreamReader stream1 = new StreamReader(path1);
+        for (int i = 0; i < 10; i++)
+        {
+            line=stream.ReadLine();
+            line1=stream1.ReadLine();
+            users[i,0]=line.Split(',')[0];
+            users[i,1]=line.Split(',')[1];
+            users[i,2]=line.Split(',')[2];
+            ownership[i,0]=line1.Split(',')[0];
+            ownership[i,1]=line1.Split(',')[1];
+            ownership[i,2]=line1.Split(',')[2];
+        }
+        stream.Close();
+        stream.Dispose();
+        stream1.Close();
+        stream1.Dispose();
+    }
     public enum MainMenuState
     {
+        LOGIN,
         NORMAL,
         GENERATOR,
         OPTIONS,
@@ -22,10 +87,11 @@ public class MainMenu
         LOAD,
         SAVE,
 #endif
-        ABOUT
+        ABOUT,
+        TOPUP
     }
 
-    public MainMenuState state = MainMenuState.NORMAL;
+    public MainMenuState state = MainMenuState.LOGIN;
 
     public void Draw()
     {
@@ -33,6 +99,10 @@ public class MainMenu
 
         switch (state)
         {
+            case MainMenuState.LOGIN:
+                DrawMenuLogin();
+                break;
+
             case MainMenuState.NORMAL:
                 DrawMenuNormal();
                 break;
@@ -47,6 +117,10 @@ public class MainMenu
 
             case MainMenuState.ABOUT:
                 DrawMenuAbout();
+                break;
+
+            case MainMenuState.TOPUP:
+                DrawMenuTopup();
                 break;
 
             case MainMenuState.JOIN_MULTIPLAYER:
@@ -94,6 +168,7 @@ public class MainMenu
 #if !UNITY_WEBPLAYER
     void DrawMenuLoadSave(bool load)
     {
+        Read();
         if (load)
             MenuSystem.BeginMenu("Load");
         else
@@ -111,17 +186,29 @@ public class MainMenu
                 else
                     prefix = "Overwrite World";
 
-                MenuSystem.Button(prefix + (i + 1).ToString() + " [ " + fileDateTime.ToString() + " ]", delegate()
+                MenuSystem.Button(prefix + (i + 1).ToString() +" ("+ ownership[i,1]+ ") [ " + fileDateTime.ToString() + " ]", delegate()
                 {
                     if (load)
                     {
-                        gameManagerUnity.worldManagerUnity.LoadWorld(i);
-                        state = MainMenuState.NORMAL;
+                        Read();
+                        if (ownership[i,1]==username){
+                            gameManagerUnity.worldManagerUnity.LoadWorld(i);
+                            state = MainMenuState.NORMAL;
+                        }
+                        else Debug.Log("not your world");
                     }
                     else
                     {
-                        gameManagerUnity.worldManagerUnity.SaveWorld(i);
-                        state = MainMenuState.NORMAL;
+                        if (ownership[i,1]==username){
+                            ownership[i,0]=i.ToString();
+                            ownership[i,1]=username;
+                            ownership[i,2]=totalPrice.ToString();
+                            gameManagerUnity.worldManagerUnity.SaveWorld(i);
+                            state = MainMenuState.NORMAL;
+                            gameManagerUnity.ReturnToMainMenu();
+                            Write();
+                        }
+                        else Debug.Log("not your world");
                     }
                 }
                 );
@@ -132,8 +219,13 @@ public class MainMenu
                 {
                     if (load == false)
                     {
+                        ownership[i,0]=i.ToString();
+                        ownership[i,1]=username;
+                        ownership[i,2]=totalPrice.ToString();
                         gameManagerUnity.worldManagerUnity.SaveWorld(i);
                         state = MainMenuState.NORMAL;
+                        gameManagerUnity.ReturnToMainMenu();
+                        Write();
                     }
                 }
                 );
@@ -156,17 +248,17 @@ public class MainMenu
     {
         MenuSystem.BeginMenu("Pause");
 
-        if (lastConfig != null)
-        {
-            MenuSystem.Button("Re-create Random World", delegate()
-            {
-                gameManagerUnity.worldManagerUnity.CreateRandomWorld(lastConfig);
-            }
-            );
-        }
+        // if (lastConfig != null)
+        // {
+        //     MenuSystem.Button("Re-create Random World", delegate()
+        //     {
+        //         gameManagerUnity.worldManagerUnity.CreateRandomWorld(lastConfig);
+        //     }
+        //     );
+        // }
 
 #if !UNITY_WEBPLAYER
-        MenuSystem.Button("Save World", delegate()
+        MenuSystem.Button("Save and exit", delegate()
         {
             state = MainMenuState.SAVE;
         }
@@ -179,13 +271,7 @@ public class MainMenu
         }
         );
 
-        MenuSystem.Button("Exit to Main Menu", delegate()
-        {
-            gameManagerUnity.ReturnToMainMenu();
-        }
-        );
-
-        MenuSystem.LastButton("Return to Game", delegate()
+        MenuSystem.LastButton("Return", delegate()
         {
             gameManagerUnity.Unpause();
         }
@@ -196,23 +282,23 @@ public class MainMenu
 
     void DrawMenuNormal()
     {
-        MenuSystem.BeginMenu("Main Menu");
+        MenuSystem.BeginMenu("Hello "+users[currentuser,0]+" (Current money: "+users[currentuser,2]+" BTC)");
 
-        MenuSystem.Button("Create Random World", delegate()
+        MenuSystem.Button("Buy a New Land", delegate()
         {
             state = MainMenuState.GENERATOR;
         }
         );
 
 #if !UNITY_WEBPLAYER
-        MenuSystem.Button("Load Saved World", delegate()
+        MenuSystem.Button("Go To Your Lands", delegate()
         {
             state = MainMenuState.LOAD;
         }
         );
 #endif
 
-        MenuSystem.Button("Join Multiplayer", delegate()
+        MenuSystem.Button("Visit Other's Lands Online", delegate()
         {
             state = MainMenuState.JOIN_MULTIPLAYER;
         }
@@ -225,11 +311,19 @@ public class MainMenu
         }
         );
 
-        MenuSystem.Button("About", delegate()
+        MenuSystem.Button("Topup", delegate()
         {
-            state = MainMenuState.ABOUT;
+            state = MainMenuState.TOPUP;
         }
         );
+
+        MenuSystem.Button("Logout", delegate()
+        {
+            state = MainMenuState.LOGIN;
+        }
+        );
+
+
 
         if (Application.platform != RuntimePlatform.WebGLPlayer && Application.isEditor == false)
         {
@@ -243,8 +337,8 @@ public class MainMenu
         MenuSystem.EndMenu();
     }
 
-    public const string CubeworldWebServerServerList = "http://cubeworldweb.appspot.com/list";
-    public const string CubeworldWebServerServerRegister = "http://cubeworldweb.appspot.com/register?owner={owner}&description={description}&port={port}";
+    public const string CubeworldWebServerServerList = "https://sunny-state-368610.et.r.appspot.com/list";
+    public const string CubeworldWebServerServerRegister = "https://sunny-state-368610.et.r.appspot.com/register?owner={owner}&description={description}&port={port}";
 
     private WWW wwwRequest;
     private string[] servers;
@@ -258,7 +352,7 @@ public class MainMenu
 
         if (servers == null && wwwRequest != null && wwwRequest.isDone)
             servers = wwwRequest.text.Split(';');
-
+        servers[0]="localhost,9999,fede,xyz";
         if (wwwRequest != null && wwwRequest.isDone)
         {
             foreach (string s in servers)
@@ -373,43 +467,60 @@ public class MainMenu
 
     void DrawGenerator()
     {
+   
         if (availableConfigurations == null)
         {
             availableConfigurations = GameManagerUnity.LoadConfiguration();
             currentDayInfoOffset = 0;
             currentGeneratorOffset = 0;
             currentSizeOffset = 0;
-            currentGameplayOffset = 0;
+            currentGameplayOffset = 2;
         }
-
-        MenuSystem.BeginMenu("Random World Generator");
-
-        MenuSystem.Button("Gameplay: " + GameplayFactory.AvailableGameplays[currentGameplayOffset].name, delegate()
-        {
-            currentGameplayOffset = (currentGameplayOffset + 1) % GameplayFactory.AvailableGameplays.Length;
+        switch(currentSizeOffset){
+            case 0:sizePrice=4;break;
+            case 1:sizePrice=2;break;
+            case 2:sizePrice=1;break;
+            case 3:sizePrice=8;break;
         }
-        );
+        switch(currentGeneratorOffset){
+            case 0:terrainPrice=4;break;
+            case 1:terrainPrice=2;break;
+            case 2:terrainPrice=6;break;
+            case 3:terrainPrice=4;break;
+            case 4:terrainPrice=3;break;
+            case 5:terrainPrice=1;break;
+            case 6:terrainPrice=6;break;
+            case 7:terrainPrice=8;break;
+            case 8:terrainPrice=10;break;
+        }
+        MenuSystem.BeginMenu("Buy a New Land (Current money: "+users[currentuser,2]+" BTC)");
 
-        MenuSystem.Button("World Size: " + availableConfigurations.worldSizes[currentSizeOffset].name, delegate()
+        // MenuSystem.Button("Gameplay: " + GameplayFactory.AvailableGameplays[currentGameplayOffset].name, delegate()
+        // {
+        //     currentGameplayOffset = (currentGameplayOffset + 1) % GameplayFactory.AvailableGameplays.Length;
+        // }
+        // );
+
+        MenuSystem.Button("World Size: " + availableConfigurations.worldSizes[currentSizeOffset].name+" (Price: +"+sizePrice+")", delegate()
         {
             currentSizeOffset = (currentSizeOffset + 1) % availableConfigurations.worldSizes.Length;
         }
         );
+
+        if (GameplayFactory.AvailableGameplays[currentGameplayOffset].hasCustomGenerator == false)
+        {
+            MenuSystem.Button(availableConfigurations.worldGenerators[currentGeneratorOffset].name+ " (Price: +"+terrainPrice+")", delegate()
+            {
+                currentGeneratorOffset = (currentGeneratorOffset + 1) % availableConfigurations.worldGenerators.Length;
+            }
+            );
+        }
 
         MenuSystem.Button("Day Length: " + availableConfigurations.dayInfos[currentDayInfoOffset].name, delegate()
         {
             currentDayInfoOffset = (currentDayInfoOffset + 1) % availableConfigurations.dayInfos.Length;
         }
         );
-
-        if (GameplayFactory.AvailableGameplays[currentGameplayOffset].hasCustomGenerator == false)
-        {
-            MenuSystem.Button("Generator: " + availableConfigurations.worldGenerators[currentGeneratorOffset].name, delegate()
-            {
-                currentGeneratorOffset = (currentGeneratorOffset + 1) % availableConfigurations.worldGenerators.Length;
-            }
-            );
-        }
 
 #if !UNITY_WEBPLAYER
         MenuSystem.Button("Host Multiplayer: " + (multiplayer ? "Yes" : "No") , delegate()
@@ -418,9 +529,18 @@ public class MainMenu
         }
         );
 #endif
+        MenuSystem.Button("Back", delegate() { state = MainMenuState.NORMAL; });
 
-        MenuSystem.LastButton("Generate!", delegate()
+        totalPrice=sizePrice+terrainPrice;
+        MenuSystem.LastButton("Generate! (Total Price:"+totalPrice+" BTC)", delegate()
         {
+
+            if (totalPrice>(Double.Parse(users[currentuser,2]))){
+                return;
+            }
+            users[currentuser,2] = (double.Parse(users[currentuser,2])-totalPrice).ToString();
+
+            Write();
             lastConfig = new CubeWorld.Configuration.Config();
             lastConfig.tileDefinitions = availableConfigurations.tileDefinitions;
 			lastConfig.itemDefinitions = availableConfigurations.itemDefinitions;
@@ -464,6 +584,64 @@ public class MainMenu
 
         MenuSystem.LastButton("Back", delegate() { state = MainMenuState.NORMAL; });
 
+        MenuSystem.EndMenu();
+    }
+
+    void DrawMenuLogin()
+    {
+        Read();
+        MenuSystem.BeginMenu("Login/Register");
+
+        username = GUI.TextField(new Rect(50, 70 , 300, 20), username, 25);
+
+        password = GUI.PasswordField(new Rect(50, 120 , 300, 20), password,"*"[0], 25);
+
+        MenuSystem.Button("Login", delegate() 
+        { 
+            for(int i=0;i<10;i++)
+            {
+                if (users[i,0]==username & users[i,1]==password){
+
+                    state = MainMenuState.NORMAL; 
+                    currentuser=i;
+                    break;
+                }
+            }
+            Debug.Log("username not found: " + username);
+        },3);
+        MenuSystem.Button("Register", delegate() 
+        { 
+            users[usercount,0]=username;
+            users[usercount,1]=password;
+            users[usercount,2]="0";
+            usercount++;
+            Debug.Log("username added: " + username);
+        },4);
+        Write();
+        MenuSystem.EndMenu();
+    }
+
+    void DrawMenuTopup()
+    {
+        
+        MenuSystem.BeginMenu("Topup (Current money: "+users[currentuser,2]+" BTC)");
+
+        MenuSystem.Button("Topup: 1.0 BTC", delegate()
+        {
+            users[currentuser,2]=(Double.Parse(users[currentuser,2])+1).ToString();
+        });
+        MenuSystem.Button("Topup: 10.0 BTC", delegate()
+        {
+            users[currentuser,2]=(Double.Parse(users[currentuser,2])+10).ToString();
+        });
+        input=GUI.TextField(new Rect(50, 180 , 300, 20), input, 25);
+        MenuSystem.Button("Topup input value", delegate()
+        {
+            users[currentuser,2]=(Double.Parse(users[currentuser,2])+Double.Parse(input)).ToString();
+        },3);
+
+        MenuSystem.LastButton("Back", delegate() { state = MainMenuState.NORMAL; });
+        Write();
         MenuSystem.EndMenu();
     }
 

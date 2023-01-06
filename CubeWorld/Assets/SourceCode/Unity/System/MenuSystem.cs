@@ -38,10 +38,13 @@ public class MenuSystem
         GUI.Box(new Rect(0, 0, 400, 400), text);
     }
 
-    static public void Button(string text, OnPressedDelegate onPressed)
+    static public void Button(string text, OnPressedDelegate onPressed, int loc=-1)
     {
         delegates.Add(onPressed);
-
+        if (loc>-1)
+        {
+            cantidadBotones=loc;
+        }
         GUI.SetNextControlName("Boton" + cantidadBotones.ToString());
 
         if (GUI.Button(new Rect(10, 40 + 30 * 2 * cantidadBotones, 380, 30), text))
